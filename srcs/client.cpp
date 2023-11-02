@@ -1,4 +1,4 @@
-#include "main.hpp"
+#include "../inc/main.hpp"
 
 std::string&	Client::getSendBuffer()  	{ return (sendbuf); }
 std::string&	Client::getReadBuffer()  	{ return (readbuf); }
@@ -8,7 +8,6 @@ bool&			Client::getConnexionPassword()	{ return (connexion_password); }
 bool&			Client::isRegistrationDone() 	{ return (registrationDone); }
 bool&			Client::reg()			{ return (welcomeSent); }
 bool&			Client::getDeconnexionStatus()	{ return (to_deconnect); }
-int				Client::getNbInfo() const 		{ return (nbInfo); }
 
 void	Client::setReadBuffer(std::string const &buf)
 {
@@ -26,7 +25,8 @@ void	Client::setDeconnexionStatus(bool status)
 }
 
 Client::Client(int client_fd)
-: client_fd(client_fd)
+:  to_deconnect(false), connexion_password(false),\
+ registrationDone(false), welcomeSent(false)
 {}
 
 Client::~Client() {}

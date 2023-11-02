@@ -62,10 +62,10 @@ public:
 	std::map<const int, Client>&	getClients();
 	int			handlePolloutEvent(std::vector<pollfd>& poll_fds, std::vector<pollfd>::iterator &it, const int current_fd);
 	void 		addClient(int client_socket, std::vector<pollfd> &poll_fds);
-	int			createClientConnexion(std::vector<pollfd>& poll_fds, std::vector<pollfd>& new_pollfds);
-	int 		handleExistingConnexion(std::vector<pollfd>& poll_fds, std::vector<pollfd>::iterator &it);
+	int			createClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>& new_pollfds);
+	int 		manageClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>::iterator &it);
 	void 		test(int const client_fd, std::string message);
-	void		delClient(std::vector<pollfd> &poll_fds, std::vector<pollfd>::iterator &it, int current_fd);
+	void		deleteClient(std::vector<pollfd> &poll_fds, std::vector<pollfd>::iterator &it, int current_fd);
     ~Server();
 };
 

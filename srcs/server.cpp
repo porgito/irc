@@ -1,4 +1,4 @@
-#include "main.hpp"
+#include "../inc/main.hpp"
 
 std::map<const int, Client>&	Server::getClients()		{ return (clients); }
 std::string 					Server::getDatetime() const { return (datetime); }
@@ -23,15 +23,15 @@ void    Server::addClient(int client_socket, std::vector<pollfd> &poll_fds)
     std::cout << "[SERVER]: CLIENT #" << client_socket << " ADDED" << std::endl;
 }
 
-int	Server::createClientConnexion(std::vector<pollfd>& poll_fds, std::vector<pollfd>& new_pollfds)
+int	Server::createClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>& new_pollfds)
 {
-	int client_sock = acceptSocket(server_socket_fd); // Accepts the socket and returns a dedicated fd for this new Client-Server connexion
+	int client_sock = acceptSocket(server_socket_fd); // on accept() le nouveau client
 	if (client_sock == -1)
 	{
-		std::cerr << "[Server] Accept() failed" << std::endl;
+		std::cerr << "[ERROR] accept() failed" << std::endl;
 		return (3);
 	}
-	addClient(client_sock, new_pollfds); // Beware, here we push the new client_socket in NEW_pollfds
+	addClient(client_sock, new_pollfds); // on met le client_sock dans le new_pollfds
 	return (SUCCESS);
 }
 
@@ -45,18 +45,19 @@ int	Server::handlePolloutEvent(std::vector<pollfd>& poll_fds, std::vector<pollfd
 		sendServerRpl(current_fd, client->getSendBuffer());
 		client->getSendBuffer().clear();
 		if (client->getDeconnexionStatus() == true)
-		{
-			delClient(poll_fds, it, current_fd);
-			return (BREAK);
-		}
+		 {
+            std::cout << "SERVER: DDDDDDD" << std::endl;
+		 	deleteClient(poll_fds, it, current_fd);
+		 	return (BREAK);
+		 }
 	}
 	return (SUCCESS);
 }
 
 int Server::serverLoop()
 {
-    std::vector<pollfd> poll_fds;
-    pollfd              server_poll_fd;
+    std::vector<pollfd> poll_fds; //vecteur de struct poll
+    pollfd              server_poll_fd; //struct pour le poll de notre serveur
 
     server_poll_fd.fd = server_socket_fd;
     server_poll_fd.events = POLLIN;
@@ -69,28 +70,28 @@ int Server::serverLoop()
         {
             if (errno == EINTR)
                 break ;
-            std::cerr << "[SERVER]: POLL ERROR" << std::endl;
+            std::cerr << "[ERROR] poll failed" << std::endl;
             throw ;
         }
         std::vector<pollfd>::iterator it = poll_fds.begin();
         while (it != poll_fds.end())
         {
-            if (it->revents & POLLIN)
+            if (it->revents & POLLIN) // si l event est un POLLIN (données pretes à recv()) on creer le client et si il existe on gere ses actions 
             {
                 if (it->fd == server_socket_fd)
                 {
                     std::cout << " test test" << std::endl;
-                    if (this->createClientConnexion(poll_fds, new_pollfds) == CONTINUE)
+                    if (this->createClient(poll_fds, new_pollfds) == CONTINUE)
                         continue;
                 }
                 else
                 {
                     std::cout << " ytrtes" << std::endl;
-                    if (this->handleExistingConnexion(poll_fds, it) == BREAK)
+                    if (this->manageClient(poll_fds, it) == BREAK)
                         break ;
                 }
             }
-            else if (it->revents & POLLOUT)
+            else if (it->revents & POLLOUT) // si l event est un POLLOUT (données pretes à send() on envoie au client)
             {
                 if (handlePolloutEvent(poll_fds, it, it->fd) == BREAK)
                     break ;
@@ -108,10 +109,10 @@ static void print(std::string type, int client_socket, char *message)
 		std::cout << std::endl << type << client_socket << " << " << message;
 }
 
-int Server::handleExistingConnexion(std::vector<pollfd>& poll_fds, std::vector<pollfd>::iterator &it)
+int Server::manageClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>::iterator &it)
 {
     Client *client;
-    client = getClient(this, it->fd);
+    client = getClient(this, it->fd); //on prend le client qu on va gerer
     char message[BUF_SIZE_MSG];
     int read_count;
 
@@ -121,20 +122,20 @@ int Server::handleExistingConnexion(std::vector<pollfd>& poll_fds, std::vector<p
     std::cout << "readcount = " << read_count << std::endl;
     if (read_count <= -1)
     {
-        std::cerr << "[SERVER]: recv() FAILED" << std::endl;
-        delClient(poll_fds, it, it->fd);
+        std::cerr << "[SERVER]: recv() failed" << std::endl;
+        deleteClient(poll_fds, it, it->fd);
         return (BREAK);
     }
-    else if (read_count == 0)
+    else if (read_count == 0) // read_count == 0 si le client se deconnecte et donc on supprime le client
     {
         std::cout << "[SERVER]: A CLIENT JUST DISCONNECTED\n";
-        delClient(poll_fds, it ,it->fd);
+        deleteClient(poll_fds, it ,it->fd);
         return (BREAK);
     }
-    else
+    else // si le read_count est positif on va gerer le message re'cu par le client
     {
-       print("[CLIENT]: MESSAGE RECEIVED FROM CLIENT ", it->fd, message);
-       client->setReadBuffer(message);
+       print("[CLIENT]: MESSAGE RECEIVED FROM CLIENT ", it->fd, message); //on print le message reçu
+       client->setReadBuffer(message); //on met le message reçu dans notre buffer
 
        if (client->getReadBuffer().find("\r\n") != std::string::npos)
        {
@@ -201,9 +202,9 @@ void Server::test(int const client_fd, std::string message)
     }
 }
 
-void Server::delClient(std::vector<pollfd> &poll_fds, std::vector<pollfd>::iterator &it, int current_fd)
+void Server::deleteClient(std::vector<pollfd> &poll_fds, std::vector<pollfd>::iterator &it, int current_fd)
 {
-    std::cout << "[SERVER] CLIENT #" << current_fd << " disconnected" << std::endl;
+    std::cout << "[SERVER]: CLIENT #" << current_fd << " disconnected" << std::endl;
 
     int key = current_fd;
 
