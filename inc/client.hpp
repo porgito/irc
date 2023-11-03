@@ -1,7 +1,7 @@
 #ifndef CLIENT_HPP
 # define CLIENT_HPP
 
-#include "main.hpp"
+#include "server.hpp"
 
 class Server;
 
@@ -29,12 +29,9 @@ public:
     std::string 	getUsername() const;
     void            setReadBuffer(std::string const &buf);
     void	        setSendBuffer(std::string const &buf);
-    void	        setDeconnexionStatus(bool status);
     bool&			getConnexionPassword();
     bool&			isRegistrationDone();
     bool&			reg();
-    bool&			getDeconnexionStatus();
-    int				getNbInfo() const;
 };
 
 Client*		getClient(Server *server, int const client_fd);

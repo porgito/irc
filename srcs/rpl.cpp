@@ -1,4 +1,4 @@
-#include "../inc/main.hpp"
+#include "../inc/server.hpp"
 
 
 Client&	retrieveClient(Server *server, int const client_fd)
@@ -17,7 +17,7 @@ void	addToClientBuffer(Server *server, int const client_fd, std::string reply)
 	client.setSendBuffer(reply);
 }
 
-void	sendServerRpl(int const client_fd, std::string client_buffer)
+void	sendToClient(int const client_fd, std::string client_buffer)
 {
 	std::istringstream	buf(client_buffer);
 	std::string			reply;
@@ -25,6 +25,6 @@ void	sendServerRpl(int const client_fd, std::string client_buffer)
 	send(client_fd, client_buffer.c_str(), client_buffer.size(), 0);
 	while (getline(buf, reply))
 	{
-		std::cout << "[Server] Message sent to client " << client_fd << " >> " << reply << std::endl;
+		std::cout << "[SERVER]: MESSAGE SENT TO CLIENT " << client_fd << "# => " << reply << std::endl;
 	}
 }

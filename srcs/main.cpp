@@ -1,4 +1,4 @@
-#include "../inc/main.hpp"
+#include "../inc/server.hpp"
 
 bool server_shutdown = false;
 

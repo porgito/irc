@@ -19,6 +19,8 @@
 #include <ctime>
 #include <fstream>
 #include <csignal>
+#include <stdlib.h>
+#include <stdio.h>
 #include "client.hpp"
 #include "numeric.hpp"
 
@@ -29,13 +31,6 @@
 # define CONTINUE 3
 
 extern bool	server_shutdown;
-
-struct cmd_struct
-{
-	std::string	prefix;
-	std::string	name;
-	std::string	message;
-};
 
 class Server
 {
@@ -64,7 +59,7 @@ public:
 	void 		addClient(int client_socket, std::vector<pollfd> &poll_fds);
 	int			createClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>& new_pollfds);
 	int 		manageClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>::iterator &it);
-	void 		test(int const client_fd, std::string message);
+	void 		checkReg(int const client_fd, std::string message);
 	void		deleteClient(std::vector<pollfd> &poll_fds, std::vector<pollfd>::iterator &it, int current_fd);
     ~Server();
 };

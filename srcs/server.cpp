@@ -1,4 +1,4 @@
-#include "../inc/main.hpp"
+#include "../inc/server.hpp"
 
 std::map<const int, Client>&	Server::getClients()		{ return (clients); }
 std::string 					Server::getDatetime() const { return (datetime); }
@@ -32,6 +32,7 @@ int	Server::createClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>& new
 		return (3);
 	}
 	addClient(client_sock, new_pollfds); // on met le client_sock dans le new_pollfds
+    std::cout << "[SERVER]: CLIENT ADDED. TOTAL CLIENT IS NOW: " << (unsigned int)(poll_fds.size()) << std::endl;
 	return (SUCCESS);
 }
 
@@ -39,17 +40,11 @@ int	Server::handlePolloutEvent(std::vector<pollfd>& poll_fds, std::vector<pollfd
 {
 	Client *client = getClient(this, current_fd);
 	if (!client)
-		std::cout << "[Server] Did not found connexion to client sorry" << std::endl;
+		std::cout << "[SERVER]: CLIENT CONNEXION NOT FOUND" << std::endl;
 	else
 	{
-		sendServerRpl(current_fd, client->getSendBuffer());
-		client->getSendBuffer().clear();
-		if (client->getDeconnexionStatus() == true)
-		 {
-            std::cout << "SERVER: DDDDDDD" << std::endl;
-		 	deleteClient(poll_fds, it, current_fd);
-		 	return (BREAK);
-		 }
+		sendToClient(current_fd, client->getSendBuffer()); // on envoie les données stockées dans sendbuf au client
+		client->getSendBuffer().clear(); // on efface les données qu on vient d envoyer car plus besoin
 	}
 	return (SUCCESS);
 }
@@ -106,7 +101,7 @@ int Server::serverLoop()
 static void print(std::string type, int client_socket, char *message)
 {
 	if (message)
-		std::cout << std::endl << type << client_socket << " << " << message;
+		std::cout << std::endl << type << client_socket << "# => " << message;
 }
 
 int Server::manageClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>::iterator &it)
@@ -122,7 +117,7 @@ int Server::manageClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>::ite
     std::cout << "readcount = " << read_count << std::endl;
     if (read_count <= -1)
     {
-        std::cerr << "[SERVER]: recv() failed" << std::endl;
+        std::cerr << "[SERVER]: recv() FAILED" << std::endl;
         deleteClient(poll_fds, it, it->fd);
         return (BREAK);
     }
@@ -132,79 +127,46 @@ int Server::manageClient(std::vector<pollfd>& poll_fds, std::vector<pollfd>::ite
         deleteClient(poll_fds, it ,it->fd);
         return (BREAK);
     }
-    else // si le read_count est positif on va gerer le message re'cu par le client
+    else // si le read_count est positif on va gerer le message reçu par le client
     {
        print("[CLIENT]: MESSAGE RECEIVED FROM CLIENT ", it->fd, message); //on print le message reçu
        client->setReadBuffer(message); //on met le message reçu dans notre buffer
 
        if (client->getReadBuffer().find("\r\n") != std::string::npos)
        {
-            try
-            {
-                test(it->fd, client->getReadBuffer());
-                if (client->getReadBuffer().find("\r\n"))
-                    client->getReadBuffer().clear();
-            }
-            catch(const std::exception& e)
-            {
-                std::cout << "[SERVER]: EXCEPTION: ";
-                std::cerr << e.what() << std::endl;
-                if (client->isRegistrationDone() == true)
-                    client->setDeconnexionStatus(true);
-                return (BREAK);
-            }
-            
+            checkReg(it->fd, client->getReadBuffer()); // vérifie si le client est enregistré sur le serveur et si il ne l est pas on 
+            if (client->getReadBuffer().find("\r\n"))  // l'acceuil sur le serv avec les messages RPL qui vont aussi permettrent 
+                client->getReadBuffer().clear();       // avec RPL_WELCOME d'accepter la connexion au serveur irc
        }
     }
     return (SUCCESS);
 }
 
-static void splitMessage(std::vector<std::string> &cmds, std::string msg)
+void	welcomeClient(Server *server, int const client_fd, std::map<const int, Client>::iterator &it)
 {
-	int pos = 0;
-	std::string delimiter = "\n";
-	std::string substr;
-
-	while ((pos = msg.find(delimiter)) != static_cast<int>(std::string::npos))
-	{
-		substr = msg.substr(0, pos);
-		cmds.push_back(substr);
-		msg.erase(0, pos + delimiter.length());
-	}
-}
-
-void	registerClient(Server *server, int const client_fd, std::map<const int, Client>::iterator &it)
-{
-	addToClientBuffer(server, client_fd, RPL_WELCOME(user_id(it->second.getNickname(), it->second.getUsername()), it->second.getNickname()));
-	addToClientBuffer(server, client_fd, RPL_YOURHOST(it->second.getNickname(), "42_Ftirc", "1.1"));
+	addToClientBuffer(server, client_fd, RPL_WELCOME(it->second.getNickname(), user_id(it->second.getNickname(), it->second.getUsername()))); // accepte la connexion du client au serveur irc
+	addToClientBuffer(server, client_fd, RPL_YOURHOST(it->second.getNickname(), "test", "42"));                                               // https://www.rfc-editor.org/rfc/rfc2812 Paragraphe 5.1
 	addToClientBuffer(server, client_fd, RPL_CREATED(it->second.getNickname(), server->getDatetime()));
-	addToClientBuffer(server, client_fd, RPL_MYINFO(it->second.getNickname(), "localhost", "1.1", "io", "kost", "k"));
-	addToClientBuffer(server, client_fd, RPL_ISUPPORT(it->second.getNickname(), "CHANNELLEN=32 NICKLEN=9 TOPICLEN=307"));
-}
+	addToClientBuffer(server, client_fd, RPL_MYINFO(it->second.getNickname(), "test", "42", "usermodes", "chmodes", "chpmodes"));
+} 
 
-void Server::test(int const client_fd, std::string message)
+void Server::checkReg(int const client_fd, std::string message)
 {
-    std::vector<std::string>    cmds;
     std::map<const int, Client>::iterator it = clients.find(client_fd);
 
-    splitMessage(cmds, message);
-
-    for(size_t i = 0; i!= cmds.size(); i++)
+    if (it->second.isRegistrationDone() == false)
     {
-        if (it->second.isRegistrationDone() == false)
+        if (it->second.reg() == false)
         {
-            if (it->second.reg() == false)
-            {
-                registerClient(this, client_fd, it);
-                it->second.reg() = true;
-            }
+            welcomeClient(this, client_fd, it);
+            it->second.reg() = true;
         }
     }
 }
 
 void Server::deleteClient(std::vector<pollfd> &poll_fds, std::vector<pollfd>::iterator &it, int current_fd)
 {
-    std::cout << "[SERVER]: CLIENT #" << current_fd << " disconnected" << std::endl;
+    std::cout << "[SERVER]: CLIENT #" << current_fd << " DISCONNECTED" << std::endl;
 
     int key = current_fd;
 
@@ -212,7 +174,7 @@ void Server::deleteClient(std::vector<pollfd> &poll_fds, std::vector<pollfd>::it
     clients.erase(key);
     poll_fds.erase(it);
 
-    std::cout << "[SERVER]: Client deleted. TOTAL CLIENT IS NOW: " << (unsigned int)(poll_fds.size() - 1) << std::endl;
+    std::cout << "[SERVER]: CLIENT DELETED. TOTAL CLIENT IS NOW: " << (unsigned int)(poll_fds.size() - 1) << std::endl;
 }
 
 Client* getClient(Server *server, int const client_fd)
